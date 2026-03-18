@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Board Academy — Dashboard de Demandas</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0D1B2E;
+    --navy-mid: #152438;
+    --navy-light: #1E3450;
+    --gold: #C9A84C;
+    --gold-light: #E2C06A;
+    --gold-dim: #8B6E30;
+    --cream: #F7F2E8;
+    --white: #FFFFFF;
+    --urgent-bg: rgba(180,30,30,0.12);
+    --urgent-border: #B41E1E;
+    --urgent-text: #FF6B6B;
+    --important-bg: rgba(201,168,76,0.1);
+    --important-border: #C9A84C;
+    --important-text: #E2C06A;
+    --text-main: #F0E8D8;
+    --text-dim: #8A9BB0;
+    --text-muted: #5A6878;
+    --cinza-borda: rgba(201,168,76,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--navy);
+    color: var(--text-main);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 0%, rgba(201,168,76,0.06) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(201,168,76,0.015) 60px, rgba(201,168,76,0.015) 61px),
+      repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(201,168,76,0.015) 60px, rgba(201,168,76,0.015) 61px);
+    pointer-events:none; z-index:0;
+  }
+  .wrapper { position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:0 32px 60px; }
+
+  /* CONFIG BANNER */
+  #config-banner {
+    background: linear-gradient(135deg, #1a0a00, #2d1500);
+    border: 1px solid #C9A84C;
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin: 32px 0;
+    display: block;
+  }
+  #config-banner h2 { font-family:'Cormorant Garamond',serif; font-size:22px; color:var(--gold-light); margin-bottom:16px; }
+  #config-banner p  { font-size:13px; color:var(--text-dim); line-height:1.7; margin-bottom:10px; }
+  #config-banner code {
+    display:inline-block;
+    background:rgba(201,168,76,0.1);
+    border:1px solid rgba(201,168,76,0.2);
+    color:var(--gold-light);
+    padding:2px 8px; border-radius:5px;
+    font-size:12px; font-family:monospace;
+  }
+  .config-steps { counter-reset:step; list-style:none; margin-top:16px; }
+  .config-steps li {
+    counter-increment:step;
+    display:flex; gap:14px; align-items:flex-start;
+    margin-bottom:12px; font-size:13px; color:var(--text-dim);
+  }
+  .config-steps li::before {
+    content:counter(step);
+    background:var(--gold); color:var(--navy);
+    font-weight:700; font-size:11px;
+    width:22px; height:22px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:1px;
+  }
+  .config-steps a { color:var(--gold-light); }
+  .config-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px; }
+  .config-form input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius:8px; padding:10px 14px;
+    color:var(--text-main); font-family:'DM Sans',sans-serif; font-size:13px;
+    outline:none; transition:border-color 0.2s;
+  }
+  .config-form input:focus { border-color:var(--gold); }
+  .config-form input::placeholder { color:var(--text-muted); }
+  .config-form .full { grid-column:1/-1; }
+  .btn-save {
+    grid-column:1/-1;
+    background:var(--gold); color:var(--navy);
+    border:none; border-radius:8px;
+    padding:12px 28px; font-family:'DM Sans',sans-serif;
+    font-weight:700; font-size:14px; cursor:pointer;
+    transition:opacity 0.2s;
+  }
+  .btn-save:hover { opacity:0.85; }
+
+  /* STATUS BAR */
+  #status-bar {
+    display:flex; align-items:center; gap:10px;
+    background:var(--navy-mid);
+    border:1px solid var(--cinza-borda);
+    border-radius:10px; padding:10px 20px;
+    margin-bottom:24px; font-size:12px; color:var(--text-dim);
+    animation: fadeUp 0.4s ease both;
+  }
+  .status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .dot-ok      { background:#74C476; box-shadow:0 0 6px #74C476; }
+  .dot-loading { background:var(--gold); box-shadow:0 0 6px var(--gold); animation:pulse 1s infinite; }
+  .dot-error   { background:#FF6B6B; box-shadow:0 0 6px #FF6B6B; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  #status-bar .spacer { margin-left:auto; }
+  #last-update { color:var(--text-muted); font-size:11px; }
+  #btn-refresh {
+    background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25);
+    color:var(--gold); border-radius:6px; padding:4px 12px;
+    font-size:11px; font-family:'DM Sans',sans-serif; cursor:pointer;
+    transition:background 0.2s;
+  }
+  #btn-refresh:hover { background:rgba(201,168,76,0.2); }
+
+  /* HEADER */
+  header {
+    padding:40px 0 28px;
+    display:flex; align-items:flex-end; justify-content:space-between;
+    border-bottom:1px solid rgba(201,168,76,0.2);
+    margin-bottom:32px;
+    animation: fadeDown 0.6s ease both;
+  }
+  .logo-badge { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .logo-diamond { width:20px; height:20px; background:var(--gold); transform:rotate(45deg); box-shadow:0 0 14px rgba(201,168,76,0.4); }
+  .logo-badge span { font-family:'Cormorant Garamond',serif; font-size:13px; font-weight:600; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); }
+  header h1 { font-family:'Cormorant Garamond',serif; font-size:38px; font-weight:700; color:var(--cream); line-height:1; letter-spacing:-0.02em; }
+  header h1 em { font-style:normal; color:var(--gold); }
+  .header-meta { text-align:right; }
+  .meta-label { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); display:block; }
+  .meta-value { font-size:14px; color:var(--text-dim); font-weight:500; display:block; margin-top:2px; }
+  .meta-value strong { color:var(--gold-light); }
+
+  /* KPIs */
+  .kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:36px; animation:fadeUp 0.6s 0.1s ease both; }
+  .kpi { background:var(--navy-mid); border:1px solid rgba(201,168,76,0.15); border-radius:12px; padding:20px 24px; transition:border-color 0.3s,transform 0.3s; position:relative; overflow:hidden; }
+  .kpi:hover { border-color:rgba(201,168,76,0.4); transform:translateY(-2px); }
+  .kpi::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:var(--gold); opacity:0; transition:opacity 0.3s; }
+  .kpi:hover::before { opacity:1; }
+  .kpi-label { font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+  .kpi-value { font-family:'Cormorant Garamond',serif; font-size:44px; font-weight:700; line-height:1; }
+  .kpi-value.gold  { color:var(--gold); }
+  .kpi-value.red   { color:var(--urgent-text); }
+  .kpi-value.blue  { color:#6BAED6; }
+  .kpi-value.green { color:#74C476; }
+  .kpi-sub { font-size:12px; color:var(--text-muted); margin-top:4px; }
+  .progress-bar-wrap { background:rgba(255,255,255,0.05); border-radius:4px; height:3px; margin-top:10px; overflow:hidden; }
+  .progress-bar { height:100%; background:linear-gradient(90deg,var(--gold-dim),var(--gold)); border-radius:4px; transition:width 0.8s ease; }
+
+  /* FILTERS */
+  .filter-bar { display:flex; gap:10px; margin-bottom:28px; flex-wrap:wrap; animation:fadeUp 0.5s 0.15s ease both; }
+  .filter-btn { padding:8px 18px; border-radius:50px; border:1px solid rgba(201,168,76,0.2); background:transparent; color:var(--text-dim); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s; }
+  .filter-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .filter-btn.active { background:var(--gold); border-color:var(--gold); color:var(--navy); font-weight:600; }
+
+  /* SECTION */
+  .section-title { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .section-pip { width:4px; height:28px; border-radius:2px; flex-shrink:0; }
+  .pip-urgent    { background:var(--urgent-border); box-shadow:0 0 8px rgba(180,30,30,0.5); }
+  .pip-important { background:var(--gold); box-shadow:0 0 8px rgba(201,168,76,0.4); }
+  .section-title h2 { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; }
+  .section-title .count { margin-left:auto; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.2); color:var(--gold); font-size:12px; font-weight:600; padding:3px 12px; border-radius:50px; }
+
+  /* CARDS */
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:14px; margin-bottom:40px; }
+  .card { background:var(--navy-mid); border-radius:14px; padding:22px 24px; border:1px solid rgba(255,255,255,0.05); position:relative; overflow:hidden; transition:transform 0.25s,box-shadow 0.25s,border-color 0.25s; animation:fadeUp 0.5s ease both; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(0,0,0,0.3); }
+  .card.urgent   { border-left:3px solid var(--urgent-border); background:linear-gradient(135deg,rgba(180,30,30,0.06) 0%,var(--navy-mid) 40%); }
+  .card.important{ border-left:3px solid var(--gold-dim); background:linear-gradient(135deg,rgba(201,168,76,0.05) 0%,var(--navy-mid) 40%); }
+  .card-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:10px; }
+  .card-num { font-family:'Cormorant Garamond',serif; font-size:13px; color:var(--text-muted); font-weight:600; min-width:26px; margin-top:2px; }
+  .card-title-wrap { flex:1; }
+  .card-title { font-size:14px; font-weight:600; color:var(--cream); line-height:1.35; margin-bottom:3px; }
+  .card-systems { font-size:11px; color:var(--text-muted); }
+  .card-badge { flex-shrink:0; padding:3px 10px; border-radius:50px; font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+  .badge-urgente   { background:var(--urgent-bg); color:var(--urgent-text); border:1px solid rgba(180,30,30,0.3); }
+  .badge-importante{ background:var(--important-bg); color:var(--important-text); border:1px solid rgba(201,168,76,0.25); }
+  .card-desc { font-size:12px; color:var(--text-dim); line-height:1.6; margin-bottom:14px; padding-left:38px; }
+  .card-footer { display:flex; align-items:center; justify-content:space-between; padding-left:38px; flex-wrap:wrap; gap:8px; }
+  .card-resp { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+  .resp-dot { width:20px; height:20px; border-radius:50%; background:var(--navy-light); border:1px solid rgba(201,168,76,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; color:var(--gold); font-weight:700; }
+  .card-deadline { font-size:11px; color:var(--text-muted); }
+  .card-deadline strong { color:var(--gold-light); }
+  .status-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:50px; font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; }
+  .status-pill::before { content:''; width:5px; height:5px; border-radius:50%; }
+  .s-todo  { background:rgba(120,120,140,0.2); color:#8A9BB0; }
+  .s-todo::before    { background:#8A9BB0; }
+  .s-doing { background:rgba(52,152,219,0.15); color:#6BAED6; }
+  .s-doing::before   { background:#6BAED6; }
+  .s-plan  { background:rgba(201,168,76,0.1); color:var(--gold); }
+  .s-plan::before    { background:var(--gold); }
+  .s-done  { background:rgba(46,160,67,0.15); color:#74C476; }
+  .s-done::before    { background:#74C476; }
+  .s-rec   { background:rgba(120,140,120,0.15); color:#8AB08A; }
+  .s-rec::before     { background:#8AB08A; }
+
+  /* EMPTY / LOADING */
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); }
+  .empty-state .icon { font-size:48px; margin-bottom:16px; opacity:0.4; }
+  .empty-state p { font-size:14px; }
+  .skeleton { background:linear-gradient(90deg,var(--navy-mid) 25%,var(--navy-light) 50%,var(--navy-mid) 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* MBE */
+  .mbe-section { background:var(--navy-mid); border:1px solid rgba(201,168,76,0.2); border-radius:16px; padding:28px 32px; margin-bottom:44px; animation:fadeUp 0.6s 0.3s ease both; position:relative; overflow:hidden; }
+  .mbe-section::before { content:'MBE'; position:absolute; right:24px;top:16px; font-family:'Cormorant Garamond',serif; font-size:80px; font-weight:700; color:rgba(201,168,76,0.04); line-height:1; pointer-events:none; }
+  .mbe-title { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:600; color:var(--gold-light); margin-bottom:4px; }
+  .mbe-sub { font-size:12px; color:var(--text-muted); margin-bottom:20px; }
+  .mbe-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+  .mbe-item { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; background:rgba(201,168,76,0.04); border:1px solid rgba(201,168,76,0.1); border-radius:10px; transition:border-color 0.2s,background 0.2s; }
+  .mbe-item:hover { border-color:rgba(201,168,76,0.3); background:rgba(201,168,76,0.08); }
+  .mbe-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+  .mbe-text { font-size:12px; color:var(--text-dim); line-height:1.5; }
+  .mbe-text strong { display:block; color:var(--cream); font-size:13px; font-weight:600; margin-bottom:2px; }
+
+  /* FOOTER */
+  footer { border-top:1px solid rgba(201,168,76,0.1); padding-top:24px; display:flex; justify-content:space-between; align-items:center; }
+  .footer-brand { display:flex; align-items:center; gap:10px; }
+  .footer-diamond { width:10px; height:10px; background:var(--gold); transform:rotate(45deg); opacity:0.5; }
+  footer span { font-size:11px; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; }
+
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:translateY(0)} }
+  .hidden { display:none!important; }
+  ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--navy)} ::-webkit-scrollbar-thumb{background:var(--navy-light);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- CONFIG BANNER (shown only if not configured) -->
+  <div id="config-banner">
+    <h2>⚙️ Configuração Inicial — Microsoft Graph API</h2>
+    <p>Para conectar o dashboard ao seu Excel Online, siga os passos abaixo <strong>uma única vez</strong>. Depois disso, os dados serão carregados automaticamente.</p>
+
+    <ol class="config-steps">
+      <li>
+        Acesse o <a href="https://portal.azure.com" target="_blank">portal.azure.com</a> → <code>Azure Active Directory</code> → <code>App registrations</code> → <code>New registration</code>. Nome: <strong>Board Dashboard</strong>, tipo: <em>Single-page application</em>, redirect URI: a URL do seu GitHub Pages.
+      </li>
+      <li>
+        Após criar, copie o <strong>Application (client) ID</strong> e o <strong>Directory (tenant) ID</strong>.
+      </li>
+      <li>
+        Vá em <code>API permissions</code> → <code>Add a permission</code> → <code>Microsoft Graph</code> → <code>Delegated</code> → adicione <strong>Files.Read</strong> e <strong>Sites.Read.All</strong>. Clique em <em>Grant admin consent</em>.
+      </li>
+      <li>
+        Abra seu Excel no <strong>OneDrive / SharePoint</strong>. A URL terá um padrão como <code>...sharepoint.com/sites/SEU_SITE/...</code> — copie o nome do site e o caminho do arquivo.
+      </li>
+      <li>
+        Preencha os campos abaixo e clique em <strong>Salvar e Conectar</strong>.
+      </li>
+    </ol>
+
+    <div class="config-form">
+      <input id="cfg-tenant"   placeholder="Tenant ID  (ex: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" />
+      <input id="cfg-client"   placeholder="Client ID   (ex: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" />
+      <input id="cfg-site"     placeholder="Nome do site SharePoint  (ex: BoardAcademy)" class="full"/>
+      <input id="cfg-filepath" placeholder="Caminho do arquivo  (ex: /Documentos/demandas.xlsx)" class="full"/>
+      <input id="cfg-sheet"    placeholder="Nome da aba no Excel  (ex: Demandas)" />
+      <input id="cfg-range"    placeholder="Intervalo de dados  (ex: A4:J50)" />
+      <button class="btn-save" onclick="saveConfig()">💾 Salvar e Conectar</button>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="status-bar" class="hidden">
+    <div class="status-dot dot-loading" id="status-dot"></div>
+    <span id="status-msg">Carregando dados...</span>
+    <span class="spacer"></span>
+    <span id="last-update"></span>
+    <button id="btn-refresh" onclick="fetchData()">↻ Atualizar</button>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="logo-badge">
+        <div class="logo-diamond"></div>
+        <span>Board Academy</span>
+      </div>
+      <h1>Dashboard de <em>Demandas</em></h1>
+    </div>
+    <div class="header-meta">
+      <span class="meta-label">Semana de referência</span>
+      <span class="meta-value"><strong id="header-week">—</strong></span>
+      <span class="meta-label" style="margin-top:8px">Responsável</span>
+      <span class="meta-value"><strong>Matheus Paz</strong></span>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-strip">
+    <div class="kpi">
+      <div class="kpi-label">Total de Demandas</div>
+      <div class="kpi-value gold" id="kpi-total">—</div>
+      <div class="kpi-sub">esta semana</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Urgentes</div>
+      <div class="kpi-value red" id="kpi-urgent">—</div>
+      <div class="kpi-sub">ação imediata</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="bar-urgent" style="width:0%"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Em Andamento</div>
+      <div class="kpi-value blue" id="kpi-doing">—</div>
+      <div class="kpi-sub">em execução</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="bar-doing" style="width:0%; background:linear-gradient(90deg,#3a7bbf,#6BAED6)"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Concluídas</div>
+      <div class="kpi-value green" id="kpi-done">—</div>
+      <div class="kpi-sub">finalizadas</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="bar-done" style="width:0%; background:linear-gradient(90deg,#2d6a2d,#74C476)"></div></div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-btn active" onclick="applyFilter('all',this)">Todas</button>
+    <button class="filter-btn" onclick="applyFilter('URGENTE',this)">🔴 Urgentes</button>
+    <button class="filter-btn" onclick="applyFilter('IMPORTANTE',this)">🟡 Importantes</button>
+    <button class="filter-btn" onclick="applyFilter('A iniciar',this)">A iniciar</button>
+    <button class="filter-btn" onclick="applyFilter('Em andamento',this)">Em andamento</button>
+    <button class="filter-btn" onclick="applyFilter('Planejamento',this)">Planejamento</button>
+    <button class="filter-btn" onclick="applyFilter('Concluído',this)">Concluído</button>
+  </div>
+
+  <!-- CARDS CONTAINER -->
+  <div id="cards-urgente-wrap">
+    <div class="section-title">
+      <div class="section-pip pip-urgent"></div>
+      <h2>Urgente</h2>
+      <span class="count" id="count-urgente">0 demandas</span>
+    </div>
+    <div class="card-grid" id="cards-urgente"></div>
+  </div>
+
+  <div id="cards-importante-wrap">
+    <div class="section-title">
+      <div class="section-pip pip-important"></div>
+      <h2>Importante</h2>
+      <span class="count" id="count-importante">0 demandas</span>
+    </div>
+    <div class="card-grid" id="cards-importante"></div>
+  </div>
+
+  <!-- MBE SECTION (static) -->
+  <div class="mbe-section">
+    <div class="mbe-title">Métricas Básicas de Execução (MBEs)</div>
+    <div class="mbe-sub">Indicadores obrigatórios e diários para o telão comercial</div>
+    <div class="mbe-grid">
+      <div class="mbe-item"><span class="mbe-icon">👤</span><div class="mbe-text"><strong>Atividades por Papel</strong>Nº de atividades por SDR, Closer e Líder</div></div>
+      <div class="mbe-item"><span class="mbe-icon">📞</span><div class="mbe-text"><strong>Ligações Diárias</strong>Número de ligações realizadas por dia</div></div>
+      <div class="mbe-item"><span class="mbe-icon">📅</span><div class="mbe-text"><strong>Reuniões Agendadas e Realizadas</strong>Mín. 5 reuniões/dia por closer</div></div>
+      <div class="mbe-item"><span class="mbe-icon">✅</span><div class="mbe-text"><strong>Taxa de Comparecimento</strong>% de shows nas reuniões agendadas</div></div>
+      <div class="mbe-item"><span class="mbe-icon">🔒</span><div class="mbe-text"><strong>Taxa de Fechamento</strong>% de conversão de reuniões em vendas</div></div>
+      <div class="mbe-item"><span class="mbe-icon">💰</span><div class="mbe-text"><strong>Ticket Médio</strong>Valor médio das vendas realizadas</div></div>
+      <div class="mbe-item"><span class="mbe-icon">📊</span><div class="mbe-text"><strong>Forecast Semanal e Mensal</strong>Projeção por time</div></div>
+      <div class="mbe-item"><span class="mbe-icon">🎯</span><div class="mbe-text"><strong>Tela de Atingimento de Meta</strong>% de progresso até a meta do período</div></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-brand">
+      <div class="footer-diamond"></div>
+      <span>Board Academy &copy; 2026</span>
+    </div>
+    <span>Time de Inteligência Comercial</span>
+  </footer>
+</div>
+
+<!-- MSAL (Microsoft Authentication Library) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.1/msal-browser.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+// CONFIG (saved in localStorage after setup)
+// ─────────────────────────────────────────────
+let CFG = {};
+let msalInstance = null;
+let currentFilter = 'all';
+let allCards = [];
+let refreshTimer = null;
+
+// Column indexes in the Excel sheet (0-based, matching your spreadsheet)
+// Adjust if your columns are in a different order
+const COL = {
+  id:         0,   // A - ID
+  prioridade: 1,   // B - Prioridade
+  demanda:    2,   // C - Demanda
+  descricao:  3,   // D - Descrição
+  sistemas:   4,   // E - Sistema(s)
+  resp:       5,   // F - Responsável
+  status:     6,   // G - Status
+  prazo:      7,   // H - Prazo
+  conclusao:  8,   // I - Conclusão
+  obs:        9,   // J - Observações
+};
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  CFG = loadConfig();
+  if (CFG.tenantId) {
+    document.getElementById('config-banner').classList.add('hidden');
+    document.getElementById('status-bar').classList.remove('hidden');
+    initMsal();
+  }
+  updateHeaderWeek();
+});
+
+function updateHeaderWeek() {
+  const now = new Date();
+  const opts = { day:'2-digit', month:'long', year:'numeric' };
+  document.getElementById('header-week').textContent = now.toLocaleDateString('pt-BR', opts);
+}
+
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+function saveConfig() {
+  const cfg = {
+    tenantId:  document.getElementById('cfg-tenant').value.trim(),
+    clientId:  document.getElementById('cfg-client').value.trim(),
+    siteName:  document.getElementById('cfg-site').value.trim(),
+    filePath:  document.getElementById('cfg-filepath').value.trim(),
+    sheetName: document.getElementById('cfg-sheet').value.trim() || 'Demandas',
+    range:     document.getElementById('cfg-range').value.trim() || 'A5:J50',
+  };
+  if (!cfg.tenantId || !cfg.clientId || !cfg.siteName || !cfg.filePath) {
+    alert('Preencha todos os campos obrigatórios.');
+    return;
+  }
+  localStorage.setItem('board_cfg', JSON.stringify(cfg));
+  CFG = cfg;
+  document.getElementById('config-banner').classList.add('hidden');
+  document.getElementById('status-bar').classList.remove('hidden');
+  initMsal();
+}
+
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem('board_cfg') || '{}'); }
+  catch { return {}; }
+}
+
+// ─────────────────────────────────────────────
+// MSAL — AUTH
+// ─────────────────────────────────────────────
+function initMsal() {
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CFG.clientId,
+      authority: `https://login.microsoftonline.com/${CFG.tenantId}`,
+      redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: 'localStorage' }
+  });
+
+  msalInstance.handleRedirectPromise().then(() => {
+    fetchData();
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(fetchData, 60000); // auto-refresh every 60s
+  }).catch(err => setStatus('error', 'Erro de autenticação: ' + err.message));
+}
+
+async function getToken() {
+  const scopes = ['Files.Read', 'Sites.Read.All'];
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const res = await msalInstance.acquireTokenSilent({ scopes, account: accounts[0] });
+      return res.accessToken;
+    } catch {}
+  }
+  // Popup login
+  const res = await msalInstance.loginPopup({ scopes });
+  return res.accessToken;
+}
+
+// ─────────────────────────────────────────────
+// FETCH DATA FROM EXCEL ONLINE
+// ─────────────────────────────────────────────
+async function fetchData() {
+  setStatus('loading', 'Buscando dados do Excel Online…');
+  try {
+    const token = await getToken();
+
+    // 1. Find the SharePoint site
+    const siteRes = await graphGet(token, `/sites?search=${encodeURIComponent(CFG.siteName)}`);
+    const site = siteRes.value?.[0];
+    if (!site) throw new Error(`Site "${CFG.siteName}" não encontrado.`);
+
+    // 2. Find the file
+    const driveRes = await graphGet(token, `/sites/${site.id}/drive/root:${CFG.filePath}`);
+    const fileId = driveRes.id;
+    if (!fileId) throw new Error('Arquivo não encontrado no SharePoint.');
+
+    // 3. Read the Excel range
+    const rangeUrl = `/sites/${site.id}/drive/items/${fileId}/workbook/worksheets/${encodeURIComponent(CFG.sheetName)}/range(address='${CFG.range}')`;
+    const rangeData = await graphGet(token, rangeUrl);
+    const rows = rangeData.values || [];
+
+    renderDashboard(rows);
+    setStatus('ok', `Dados atualizados — ${rows.length} linhas carregadas`);
+    document.getElementById('last-update').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+
+  } catch (err) {
+    setStatus('error', 'Erro: ' + (err.message || String(err)));
+    console.error(err);
+  }
+}
+
+async function graphGet(token, path) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function renderDashboard(rows) {
+  allCards = rows.filter(r => r[COL.demanda] && String(r[COL.demanda]).trim());
+
+  const urgent    = allCards.filter(r => norm(r[COL.prioridade]) === 'URGENTE');
+  const important = allCards.filter(r => norm(r[COL.prioridade]) === 'IMPORTANTE');
+  const doing     = allCards.filter(r => norm(r[COL.status]) === 'EM ANDAMENTO');
+  const done      = allCards.filter(r => norm(r[COL.status]) === 'CONCLUÍDO');
+  const total     = allCards.length;
+
+  // KPIs
+  document.getElementById('kpi-total').textContent  = total;
+  document.getElementById('kpi-urgent').textContent = urgent.length;
+  document.getElementById('kpi-doing').textContent  = doing.length;
+  document.getElementById('kpi-done').textContent   = done.length;
+  document.getElementById('bar-urgent').style.width = pct(urgent.length, total);
+  document.getElementById('bar-doing').style.width  = pct(doing.length, total);
+  document.getElementById('bar-done').style.width   = pct(done.length, total);
+
+  // Filter counts
+  document.getElementById('count-urgente').textContent   = urgent.length + ' demandas';
+  document.getElementById('count-importante').textContent = important.length + ' demandas';
+
+  // Render sections
+  renderSection('cards-urgente',    urgent);
+  renderSection('cards-importante', important);
+
+  // Re-apply active filter
+  applyFilter(currentFilter);
+}
+
+function renderSection(containerId, rows) {
+  const grid = document.getElementById(containerId);
+  grid.innerHTML = '';
+  if (!rows.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">✓</div><p>Nenhuma demanda nesta categoria.</p></div>';
+    return;
+  }
+  rows.forEach((r, i) => {
+    const prio    = String(r[COL.prioridade] || '').trim();
+    const status  = String(r[COL.status] || 'A iniciar').trim();
+    const card    = document.createElement('div');
+    card.className = `card ${prio.toLowerCase()}`;
+    card.dataset.prio   = prio.toUpperCase();
+    card.dataset.status = status;
+    card.style.animationDelay = (i * 0.05) + 's';
+
+    const initials = (String(r[COL.resp] || 'MP')).split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const prazo = formatDate(r[COL.prazo]);
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-num">${String(r[COL.id] || (i+1)).padStart(2,'0')}</span>
+        <div class="card-title-wrap">
+          <div class="card-title">${esc(r[COL.demanda])}</div>
+          <div class="card-systems">${esc(r[COL.sistemas] || '—')}</div>
+        </div>
+        <span class="card-badge badge-${prio.toLowerCase()}">${esc(prio)}</span>
+      </div>
+      <div class="card-desc">${esc(r[COL.descricao] || '')}</div>
+      <div class="card-footer">
+        <span class="card-resp"><span class="resp-dot">${initials}</span>${esc(r[COL.resp] || '')}</span>
+        <span class="status-pill ${statusClass(status)}">${esc(status)}</span>
+        <span class="card-deadline">Prazo: <strong>${prazo}</strong></span>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────
+// FILTER
+// ─────────────────────────────────────────────
+function applyFilter(type, btn) {
+  currentFilter = type;
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  document.querySelectorAll('.card').forEach(card => {
+    const prio   = card.dataset.prio;
+    const status = card.dataset.status;
+    let show = false;
+    if (type === 'all') show = true;
+    else if (type === 'URGENTE' || type === 'IMPORTANTE') show = prio === type;
+    else show = status.toLowerCase() === type.toLowerCase();
+    card.classList.toggle('hidden', !show);
+  });
+}
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function norm(v) { return String(v || '').trim().toUpperCase(); }
+function esc(v)  { return String(v || '').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function pct(a, b) { return b ? Math.round(a/b*100)+'%' : '0%'; }
+
+function statusClass(s) {
+  const m = { 'a iniciar':'s-todo','em andamento':'s-doing','planejamento':'s-plan','concluído':'s-done','concluido':'s-done','recorrente':'s-rec' };
+  return m[s.toLowerCase()] || 's-todo';
+}
+
+function formatDate(v) {
+  if (!v) return '—';
+  if (typeof v === 'number') {
+    // Excel serial date
+    const d = new Date((v - 25569) * 86400 * 1000);
+    return d.toLocaleDateString('pt-BR');
+  }
+  return String(v);
+}
+
+function setStatus(type, msg) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot dot-' + (type === 'ok' ? 'ok' : type === 'error' ? 'error' : 'loading');
+  document.getElementById('status-msg').textContent = msg;
+}
+</script>
+</body>
+</html>

@@ -26,25 +26,6 @@
   }
   .wrapper { position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:0 32px 60px; }
 
-  /* CONFIG */
-  #config-banner { background:linear-gradient(135deg,#1a0a00,#2d1500); border:1px solid var(--gold); border-radius:14px; padding:28px 32px; margin:32px 0; }
-  #config-banner h2 { font-family:'Cormorant Garamond',serif; font-size:22px; color:var(--gold-light); margin-bottom:10px; }
-  #config-banner p { font-size:13px; color:var(--text-dim); line-height:1.7; margin-bottom:6px; }
-  code { display:inline-block; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.2); color:var(--gold-light); padding:2px 8px; border-radius:5px; font-size:12px; font-family:monospace; }
-  .config-steps { counter-reset:step; list-style:none; margin-top:12px; }
-  .config-steps li { counter-increment:step; display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; font-size:13px; color:var(--text-dim); line-height:1.6; }
-  .config-steps li::before { content:counter(step); background:var(--gold); color:var(--navy); font-weight:700; font-size:11px; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
-  .config-steps a { color:var(--gold-light); }
-  .detected-box { background:rgba(201,168,76,0.07); border:1px solid rgba(201,168,76,0.25); border-radius:10px; padding:14px 18px; margin:14px 0; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .detected-row { display:flex; flex-direction:column; gap:3px; }
-  .detected-row label { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); }
-  .detected-row code { font-size:12px; }
-  .config-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
-  .config-form input { background:rgba(255,255,255,0.05); border:1px solid rgba(201,168,76,0.3); border-radius:8px; padding:10px 14px; color:var(--text-main); font-family:'DM Sans',sans-serif; font-size:13px; outline:none; transition:border-color 0.2s; }
-  .config-form input:focus { border-color:var(--gold); }
-  .config-form input::placeholder { color:var(--text-muted); }
-  .btn-save { grid-column:1/-1; background:var(--gold); color:var(--navy); border:none; border-radius:8px; padding:12px; font-family:'DM Sans',sans-serif; font-weight:700; font-size:14px; cursor:pointer; transition:opacity 0.2s; }
-  .btn-save:hover { opacity:0.85; }
   .btn-sm { background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25); color:var(--gold); border-radius:6px; padding:4px 12px; font-size:11px; font-family:'DM Sans',sans-serif; cursor:pointer; transition:background 0.2s; }
   .btn-sm:hover { background:rgba(201,168,76,0.2); }
 
@@ -162,57 +143,13 @@
 <body>
 <div class="wrapper">
 
-  <!-- CONFIG BANNER -->
-  <div id="config-banner">
-    <h2>⚙️ Configuração — Microsoft Graph API</h2>
-    <p>Conecte ao seu Excel Online do OneDrive. Faça isso <strong>uma única vez</strong> — fica salvo no navegador.</p>
-    <ol class="config-steps">
-      <li>
-        Acesse <a href="https://portal.azure.com" target="_blank">portal.azure.com</a> → <strong>App registrations → New registration</strong><br>
-        Nome: <code>Board Dashboard</code> · Tipo: SPA · Redirect URI: URL do seu GitHub Pages
-      </li>
-      <li>Copie o <strong>Application (client) ID</strong> e o <strong>Directory (tenant) ID</strong></li>
-      <li>Vá em <strong>API permissions → Add → Microsoft Graph → Delegated</strong> → adicione <code>Files.Read</code> e <code>Sites.Read.All</code> → <em>Grant admin consent</em></li>
-      <li>Cole os IDs abaixo — o restante já está pré-configurado com base no seu arquivo.</li>
-    </ol>
-
-    <div class="detected-box">
-      <div class="detected-row" style="grid-column:1/-1">
-        <label>✅ Detectados do seu OneDrive</label>
-      </div>
-      <div class="detected-row">
-        <label>Host SharePoint</label>
-        <code>boardacademy-my.sharepoint.com</code>
-      </div>
-      <div class="detected-row">
-        <label>Usuário</label>
-        <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="066b67726e6373752876677c46646967746267656762636b7f2865696b286474">[email&#160;protected]</a></code>
-      </div>
-      <div class="detected-row">
-        <label>Arquivo</label>
-        <code>demandas_semana.xlsx</code>
-      </div>
-      <div class="detected-row">
-        <label>Aba · Intervalo</label>
-        <code>Demandas da Semana · A5:J17</code>
-      </div>
-    </div>
-
-    <div class="config-form">
-      <input id="cfg-tenant" placeholder="Tenant ID  (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" />
-      <input id="cfg-client" placeholder="Client ID   (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" />
-      <button class="btn-save" onclick="saveConfig()">💾 Salvar e Conectar</button>
-    </div>
-  </div>
-
   <!-- STATUS BAR -->
   <div id="status-bar">
     <div class="status-dot dot-loading" id="status-dot"></div>
     <span id="status-msg">Carregando…</span>
     <span class="spacer"></span>
     <span id="last-update"></span>
-    <button class="btn-sm" onclick="fetchData()" style="margin-right:6px">↻ Atualizar</button>
-    <button class="btn-sm" onclick="showConfig()">⚙ Config</button>
+    <button class="btn-sm" onclick="fetchData()">↻ Atualizar</button>
   </div>
 
   <!-- HEADER -->
@@ -329,6 +266,8 @@
 (function(W) {
 
   // ── CONSTANTES ────────────────────────────────────────────────────────────
+  var TENANT_ID  = 'ea06a4f8-af74-49ad-ade9-90eedd9d720e';
+  var CLIENT_ID  = '85f7de7e-7983-4c0f-92c2-376cfb34df68';
   var FILE_NAME  = 'demandas_semana.xlsx';
   var SHEET_NAME = 'Demandas da Semana';
   var DATA_RANGE = 'A5:J17';
@@ -336,7 +275,6 @@
   var C = { id:0, prio:1, demanda:2, desc:3, sys:4, resp:5, status:6, prazo:7, conc:8, obs:9 };
 
   // ── STATE ─────────────────────────────────────────────────────────────────
-  var CFG = {};
   var msal_app = null;
   var activeFilter = 'all';
   var timer = null;
@@ -368,28 +306,6 @@
     return (s.toLowerCase()==='contínuo'||s.toLowerCase()==='continuo') ? 'Contínuo' : s;
   }
 
-  // ── CONFIG ────────────────────────────────────────────────────────────────
-  function loadCfg() { try { return JSON.parse(localStorage.getItem('ba_cfg')||'{}'); } catch(e) { return {}; } }
-
-  function hideBanner() {
-    var b = $id('config-banner'); if(b) b.classList.add('hidden');
-  }
-
-  W.showConfig = function() {
-    var b = $id('config-banner'); if(b) b.classList.remove('hidden');
-  };
-
-  W.saveConfig = function() {
-    var t = ($id('cfg-tenant')||{value:''}).value.trim();
-    var c = ($id('cfg-client')||{value:''}).value.trim();
-    if (!t || !c) { alert('Preencha o Tenant ID e o Client ID.'); return; }
-    CFG = { tenantId:t, clientId:c };
-    localStorage.setItem('ba_cfg', JSON.stringify(CFG));
-    hideBanner();
-    setStatus('loading', 'Inicializando conexão com Microsoft…');
-    loadMsal(function() { initMsal(); });
-  };
-
   // ── MSAL LOADER ───────────────────────────────────────────────────────────
   function loadMsal(cb) {
     if (typeof msal !== 'undefined') { cb(); return; }
@@ -411,8 +327,8 @@
     try {
       msal_app = new msal.PublicClientApplication({
         auth: {
-          clientId: CFG.clientId,
-          authority: 'https://login.microsoftonline.com/' + CFG.tenantId,
+          clientId: CLIENT_ID,
+          authority: 'https://login.microsoftonline.com/' + TENANT_ID,
           redirectUri: window.location.origin + window.location.pathname,
         },
         cache: { cacheLocation: 'localStorage' }
@@ -459,8 +375,7 @@
   // ── FETCH DATA ────────────────────────────────────────────────────────────
   W.fetchData = function() {
     if (!msal_app) {
-      setStatus('error', 'Configure o Tenant ID e Client ID primeiro.');
-      W.showConfig();
+      setStatus('error', 'Aguarde — inicializando conexão…');
       return;
     }
     setStatus('loading', 'Buscando dados do Excel Online…');
@@ -583,14 +498,8 @@
   // ── BOOT ──────────────────────────────────────────────────────────────────
   function boot() {
     setWeek();
-    CFG = loadCfg();
-    if (CFG.tenantId && CFG.clientId) {
-      hideBanner();
-      setStatus('loading', 'Carregando biblioteca Microsoft…');
-      loadMsal(function() { initMsal(); });
-    } else {
-      setStatus('error', 'Aguardando configuração — preencha os campos acima.');
-    }
+    setStatus('loading', 'Carregando biblioteca Microsoft…');
+    loadMsal(function() { initMsal(); });
   }
 
   if (document.readyState === 'loading') {

@@ -334,7 +334,11 @@
         cache: { cacheLocation: 'localStorage' }
       });
       msal_app.handleRedirectPromise()
-        .then(function() {
+        .then(function(result) {
+          // result não-nulo = voltou do redirect de login com token
+          if (result) {
+            setStatus('loading', 'Login realizado! Carregando dados…');
+          }
           W.fetchData();
           if (timer) clearInterval(timer);
           timer = setInterval(W.fetchData, 60000);
@@ -346,6 +350,7 @@
   }
 
   // ── TOKEN ─────────────────────────────────────────────────────────────────
+  // Usa redirect (não popup) para evitar bloqueio de popup no browser
   function getToken() {
     if (!msal_app) return Promise.reject(new Error('MSAL não inicializado.'));
     var scopes = ['Files.Read', 'Sites.Read.All'];
@@ -354,10 +359,14 @@
       return msal_app.acquireTokenSilent({ scopes: scopes, account: accts[0] })
         .then(function(r) { return r.accessToken; })
         .catch(function() {
-          return msal_app.loginPopup({ scopes: scopes }).then(function(r) { return r.accessToken; });
+          // Token expirado: redireciona para renovar (volta automaticamente)
+          msal_app.acquireTokenRedirect({ scopes: scopes, account: accts[0] });
+          return new Promise(function() {}); // suspende — redirect vai acontecer
         });
     }
-    return msal_app.loginPopup({ scopes: scopes }).then(function(r) { return r.accessToken; });
+    // Primeiro acesso: redireciona para login Microsoft (sem popup)
+    msal_app.loginRedirect({ scopes: scopes });
+    return new Promise(function() {}); // suspende — redirect vai acontecer
   }
 
   // ── GRAPH GET ─────────────────────────────────────────────────────────────

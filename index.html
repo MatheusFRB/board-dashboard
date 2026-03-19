@@ -419,12 +419,16 @@
   // Adicione aqui todos os membros do time que aparecem como responsáveis
   // Mapa: nome exato como aparece na coluna "Responsável" do Excel → e-mail Microsoft 365
   // Adicione novos membros aqui conforme necessário
+  // Mapa nome (como aparece no Excel) → e-mail Microsoft 365
+  // Adicione aqui qualquer novo membro do time
   var UPN_MAP = {
-    'Matheus Paz':    'matheus.paz@boardacademy.com.br',
-    'Rodrigo':        'rodrigo@boardacademy.com.br',
-    'Rodrigo / Camila': 'rodrigo@boardacademy.com.br',
-    'Camila':         'camila@boardacademy.com.br',
-    'Naize':          'naize@boardacademy.com.br',
+    'Matheus Paz':      'matheus.paz@boardacademy.com.br',
+    'Rodrigo Leira':    'rodrigo.leira@boardacademy.com.br',
+    'João Recchia':     'joao.recchia@boardacademy.com.br',
+    'Rodrigo':          'rodrigo.leira@boardacademy.com.br',
+    'Rodrigo / Camila': 'rodrigo.leira@boardacademy.com.br',
+    'Camila':           'camila@boardacademy.com.br',
+    'Naize':            'naize@boardacademy.com.br',
   };
 
   function getToken_() {
@@ -448,14 +452,20 @@
     var token = getToken_();
     if (!token) return;
 
-    // Pegar o primeiro nome do campo (ex: "Rodrigo / Camila" → "Rodrigo")
+    // Buscar UPN pelo nome exato ou pelo primeiro nome (ex: "Rodrigo / Camila" → "Rodrigo")
     var firstName = displayName.split('/')[0].trim();
-    var upn = UPN_MAP[firstName] || UPN_MAP[displayName];
-    var photoUrl = upn
-      ? 'https://graph.microsoft.com/v1.0/users/' + upn + '/photo/$value'
-      : 'https://graph.microsoft.com/v1.0/me/photo/$value'; // fallback: foto do usuário logado
+    var upn = UPN_MAP[displayName] || UPN_MAP[firstName];
 
-    fetch(photoUrl, { headers: { Authorization: 'Bearer ' + token } })
+    // Se não tiver UPN mapeado, marca como null e mantém as iniciais
+    // NUNCA usar /me/photo como fallback pois retorna sempre a foto do usuário logado
+    if (!upn) {
+      photoCache[displayName] = null;
+      return;
+    }
+
+    fetch('https://graph.microsoft.com/v1.0/users/' + upn + '/photo/$value', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
       .then(function(r) {
         if (!r.ok) throw new Error('no photo');
         return r.blob();
@@ -463,10 +473,17 @@
       .then(function(blob) {
         var url = URL.createObjectURL(blob);
         photoCache[displayName] = url;
-        applyPhoto(dotEl, url);
+        // Aplicar em TODOS os cards deste responsável (não só o atual)
+        document.querySelectorAll('.card').forEach(function(card) {
+          var cardResp = card.querySelector('.card-resp');
+          if (cardResp && cardResp.textContent.trim().startsWith(displayName.split('/')[0].trim())) {
+            var dot = card.querySelector('.resp-dot');
+            if (dot) applyPhoto(dot, url);
+          }
+        });
       })
       .catch(function() {
-        photoCache[displayName] = null; // marcar como sem foto para não tentar de novo
+        photoCache[displayName] = null;
       });
   }
 

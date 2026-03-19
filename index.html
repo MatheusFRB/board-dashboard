@@ -97,7 +97,9 @@
   .card-obs { font-size:11px; color:var(--gold-dim); background:rgba(201,168,76,0.06); border-left:2px solid var(--gold-dim); padding:5px 10px 5px 34px; border-radius:0 4px 4px 0; margin-bottom:12px; }
   .card-footer { display:flex; align-items:center; justify-content:space-between; padding-left:34px; flex-wrap:wrap; gap:6px; }
   .card-resp { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
-  .resp-dot { width:20px; height:20px; border-radius:50%; background:var(--navy-light); border:1px solid rgba(201,168,76,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; color:var(--gold); font-weight:700; }
+  .resp-dot { width:28px; height:28px; border-radius:50%; background:var(--navy-light); border:2px solid rgba(201,168,76,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; color:var(--gold); font-weight:700; overflow:hidden; flex-shrink:0; transition:border-color 0.3s; }
+  .resp-dot img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+  .resp-dot:has(img) { border-color:rgba(201,168,76,0.6); }
   .card-prazo { font-size:11px; color:var(--text-muted); }
   .card-prazo strong { color:var(--gold-light); }
 
@@ -280,6 +282,7 @@
   var msal_app = null;
   var activeFilter = 'all';
   var timer = null;
+  var photoCache = {}; // cache: "Nome Sobrenome" -> data URL da foto
   var domReady = false;
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
@@ -411,6 +414,67 @@
     });
   };
 
+  // ── FOTOS DE PERFIL ───────────────────────────────────────────────────────
+  // Mapa nome exibição → UPN do Microsoft 365
+  // Adicione aqui todos os membros do time que aparecem como responsáveis
+  // Mapa: nome exato como aparece na coluna "Responsável" do Excel → e-mail Microsoft 365
+  // Adicione novos membros aqui conforme necessário
+  var UPN_MAP = {
+    'Matheus Paz':    'matheus.paz@boardacademy.com.br',
+    'Rodrigo':        'rodrigo@boardacademy.com.br',
+    'Rodrigo / Camila': 'rodrigo@boardacademy.com.br',
+    'Camila':         'camila@boardacademy.com.br',
+    'Naize':          'naize@boardacademy.com.br',
+  };
+
+  function getToken_() {
+    var keys = Object.keys(localStorage).filter(function(k){ return k.toLowerCase().includes('accesstoken'); });
+    var token = null;
+    keys.forEach(function(k) {
+      try { var o = JSON.parse(localStorage[k]); if (o.credentialType === 'AccessToken' && o.secret.includes('.')) token = o.secret; } catch(e) {}
+    });
+    return token;
+  }
+
+  function fetchPhoto(displayName, dotEl) {
+    if (!displayName || displayName === '—') return;
+
+    // Se já tiver em cache, aplica direto
+    if (photoCache[displayName] !== undefined) {
+      if (photoCache[displayName]) applyPhoto(dotEl, photoCache[displayName]);
+      return;
+    }
+
+    var token = getToken_();
+    if (!token) return;
+
+    // Pegar o primeiro nome do campo (ex: "Rodrigo / Camila" → "Rodrigo")
+    var firstName = displayName.split('/')[0].trim();
+    var upn = UPN_MAP[firstName] || UPN_MAP[displayName];
+    var photoUrl = upn
+      ? 'https://graph.microsoft.com/v1.0/users/' + upn + '/photo/$value'
+      : 'https://graph.microsoft.com/v1.0/me/photo/$value'; // fallback: foto do usuário logado
+
+    fetch(photoUrl, { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) {
+        if (!r.ok) throw new Error('no photo');
+        return r.blob();
+      })
+      .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        photoCache[displayName] = url;
+        applyPhoto(dotEl, url);
+      })
+      .catch(function() {
+        photoCache[displayName] = null; // marcar como sem foto para não tentar de novo
+      });
+  }
+
+  function applyPhoto(dotEl, url) {
+    if (!dotEl) return;
+    dotEl.innerHTML = '<img src="' + url + '" alt="">';
+  }
+
   // ── RENDER ────────────────────────────────────────────────────────────────
   function render(rows) {
     var urg      = rows.filter(function(r){ return up(r[C.prio])==='URGENTE'; });
@@ -473,6 +537,11 @@
           '<span class="card-prazo">Prazo: <strong>' + fmtDate(r[C.prazo]) + '</strong></span>' +
         '</div>';
       g.appendChild(card);
+
+      // Buscar foto do responsável e aplicar no avatar
+      var dotEl = card.querySelector('.resp-dot');
+      var respName = String(r[C.resp] || '').split('/')[0].trim();
+      if (respName && dotEl) fetchPhoto(respName, dotEl);
     });
   }
 

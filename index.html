@@ -321,237 +321,286 @@
   </footer>
 </div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.1/msal-browser.min.js"></script>
 <script>
-// ── PRÉ-CONFIGURADOS (detectados do seu arquivo) ──────────────────────────
-const FILE_NAME  = 'demandas_semana.xlsx';
-const SHEET_NAME = 'Demandas da Semana';
-const DATA_RANGE = 'A5:J17';
-const UPN        = 'matheus.paz@boardacademy.com.br'; // ajuste se necessário
+// ═══════════════════════════════════════════════════════════════════════════
+// BOARD ACADEMY DASHBOARD — todas as funções explicitamente no window
+// para sobreviver a qualquer injeção de escopo pelo Cloudflare/GitHub Pages
+// ═══════════════════════════════════════════════════════════════════════════
+(function(W) {
 
-// Colunas (0-indexed): A=0 B=1 ... J=9
-const C = { id:0, prio:1, demanda:2, desc:3, sys:4, resp:5, status:6, prazo:7, conc:8, obs:9 };
+  // ── CONSTANTES ────────────────────────────────────────────────────────────
+  var FILE_NAME  = 'demandas_semana.xlsx';
+  var SHEET_NAME = 'Demandas da Semana';
+  var DATA_RANGE = 'A5:J17';
+  var UPN        = 'matheus.paz@boardacademy.com.br';
+  var C = { id:0, prio:1, demanda:2, desc:3, sys:4, resp:5, status:6, prazo:7, conc:8, obs:9 };
 
-// ── STATE ──────────────────────────────────────────────────────────────────
-let CFG = {};
-let msal_app = null;
-let activeFilter = 'all';
-let timer = null;
+  // ── STATE ─────────────────────────────────────────────────────────────────
+  var CFG = {};
+  var msal_app = null;
+  var activeFilter = 'all';
+  var timer = null;
+  var domReady = false;
 
-// ── INIT ───────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  CFG = loadCfg();
-  setWeek();
-  // Mostrar status inicial
-  if (CFG.tenantId && CFG.clientId) {
-    document.getElementById('config-banner').classList.add('hidden');
-    setStatus('loading', 'Inicializando conexão com Microsoft…');
-    initMsal();
-  } else {
-    setStatus('error', 'Aguardando configuração — preencha o Tenant ID e Client ID abaixo.');
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function up(v)  { return String(v||'').trim().toUpperCase(); }
+  function x(v)   { return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function $id(id){ return document.getElementById(id); }
+  function setText(id,v){ var el=$id(id); if(el) el.textContent=v; }
+  function setPB(id,a,b){ var el=$id(id); if(el) el.style.width=b?Math.round(a/b*100)+'%':'0%'; }
+
+  function setStatus(type, msg) {
+    var dot = $id('status-dot');
+    if (dot) dot.className = 'status-dot ' + (type==='ok'?'dot-ok':type==='error'?'dot-error':'dot-loading');
+    setText('status-msg', msg);
   }
-});
 
-function setWeek() {
-  const d = new Date();
-  document.getElementById('header-week').textContent =
-    d.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
-}
-
-// ── CONFIG ─────────────────────────────────────────────────────────────────
-function saveConfig() {
-  const t = document.getElementById('cfg-tenant').value.trim();
-  const c = document.getElementById('cfg-client').value.trim();
-  if (!t || !c) { alert('Preencha os dois campos.'); return; }
-  CFG = { tenantId:t, clientId:c };
-  localStorage.setItem('ba_cfg', JSON.stringify(CFG));
-  hideBanner(); initMsal();
-}
-function loadCfg() { try { return JSON.parse(localStorage.getItem('ba_cfg')||'{}'); } catch { return {}; } }
-function hideBanner() {
-  document.getElementById('config-banner').classList.add('hidden');
-  document.getElementById('status-bar').classList.remove('hidden');
-}
-function showConfig() {
-  document.getElementById('config-banner').classList.remove('hidden');
-  document.getElementById('status-bar').classList.remove('hidden');
-}
-
-// ── MSAL ───────────────────────────────────────────────────────────────────
-function initMsal() {
-  msal_app = new msal.PublicClientApplication({
-    auth: {
-      clientId: CFG.clientId,
-      authority: `https://login.microsoftonline.com/${CFG.tenantId}`,
-      redirectUri: window.location.origin + window.location.pathname,
-    },
-    cache: { cacheLocation:'localStorage' }
-  });
-  msal_app.handleRedirectPromise()
-    .then(() => { fetchData(); if(timer) clearInterval(timer); timer = setInterval(fetchData, 60000); })
-    .catch(e => setStatus('error', 'Auth: ' + e.message));
-}
-
-async function getToken() {
-  if (!msal_app) throw new Error('MSAL não inicializado. Configure o app Azure primeiro.');
-  const scopes = ['Files.Read','Sites.Read.All'];
-  const accts  = msal_app.getAllAccounts();
-  if (accts.length) {
-    try { return (await msal_app.acquireTokenSilent({ scopes, account:accts[0] })).accessToken; }
-    catch {}
-  }
-  return (await msal_app.loginPopup({ scopes })).accessToken;
-}
-
-// ── FETCH ──────────────────────────────────────────────────────────────────
-async function fetchData() {
-  if (!msal_app) {
-    setStatus('error', 'Configure o Tenant ID e Client ID primeiro.');
-    showConfig();
-    return;
-  }
-  setStatus('loading', 'Buscando dados do Excel Online…');
-  try {
-    const token = await getToken();
-
-    // Tenta /me primeiro; se 403, usa UPN explícito
-    let driveBase;
-    try {
-      const me = await gGet(token, '/me');
-      driveBase = `/users/${encodeURIComponent(me.userPrincipalName)}/drive`;
-    } catch {
-      driveBase = `/users/${encodeURIComponent(UPN)}/drive`;
-    }
-
-    // Localizar arquivo (tenta /Documents/ e raiz)
-    let file;
-    try { file = await gGet(token, `${driveBase}/root:/Documents/${FILE_NAME}`); }
-    catch { file = await gGet(token, `${driveBase}/root:/${FILE_NAME}`); }
-
-    if (!file?.id) throw new Error('Arquivo não encontrado no OneDrive.');
-
-    // Ler intervalo
-    const url = `${driveBase}/items/${file.id}/workbook/worksheets/${encodeURIComponent(SHEET_NAME)}/range(address='${DATA_RANGE}')`;
-    const data = await gGet(token, url);
-    const rows = (data.values || []).filter(r => r[C.demanda] && String(r[C.demanda]).trim());
-
-    render(rows);
-    setStatus('ok', `${rows.length} demandas carregadas`);
-    document.getElementById('last-update').textContent =
-      'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
-  } catch(e) {
-    setStatus('error', e.message || String(e));
-    console.error(e);
-  }
-}
-
-async function gGet(token, path) {
-  const r = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!r.ok) {
-    const b = await r.json().catch(()=>({}));
-    throw new Error(b?.error?.message || `HTTP ${r.status}`);
-  }
-  return r.json();
-}
-
-// ── RENDER ─────────────────────────────────────────────────────────────────
-function render(rows) {
-  const urg      = rows.filter(r => up(r[C.prio]) === 'URGENTE');
-  const imp      = rows.filter(r => up(r[C.prio]) === 'IMPORTANTE');
-  const doing    = rows.filter(r => up(r[C.status]) === 'EM ANDAMENTO');
-  const entregue = rows.filter(r => up(r[C.status]) === 'ENTREGUE');
-  const todo     = rows.filter(r => up(r[C.status]) === 'A INICIAR');
-  const n        = rows.length;
-
-  setText('kpi-total',   n);
-  setText('kpi-urg',     urg.length);
-  setText('kpi-doing',   doing.length);
-  setText('kpi-entregue',entregue.length);
-  setText('kpi-todo',    todo.length);
-  setPB('pb-urg',     urg.length, n);
-  setPB('pb-doing',   doing.length, n);
-  setPB('pb-entregue',entregue.length, n);
-  setPB('pb-todo',    todo.length, n);
-  setText('cnt-urg', urg.length + ' demandas');
-  setText('cnt-imp', imp.length + ' demandas');
-
-  renderGrid('grid-urg', urg);
-  renderGrid('grid-imp', imp);
-  applyFilter(activeFilter);
-}
-
-function renderGrid(id, rows) {
-  const g = document.getElementById(id);
-  g.innerHTML = '';
-  if (!rows.length) {
-    g.innerHTML = '<div class="empty-state"><div class="icon">✓</div><p>Nenhuma demanda nesta categoria.</p></div>';
-    return;
-  }
-  rows.forEach((r, i) => {
-    const prio   = String(r[C.prio]   || '').trim();
-    const status = String(r[C.status] || 'A iniciar').trim();
-    const obs    = String(r[C.obs]    || '').trim();
-    const inits  = String(r[C.resp]||'MP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const faded  = up(status) === 'ENTREGUE';
-
-    const card = document.createElement('div');
-    card.className = `card ${prio.toLowerCase()}${faded?' faded':''}`;
-    card.dataset.prio   = prio.toUpperCase();
-    card.dataset.status = status;
-    card.style.animationDelay = (i*0.05)+'s';
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-num">${String(r[C.id]||(i+1)).padStart(2,'0')}</span>
-        <div class="card-title-wrap">
-          <div class="card-title">${x(r[C.demanda])}</div>
-          <div class="card-sys">${x(r[C.sys]||'—')}</div>
-        </div>
-        <span class="badge badge-${prio.toLowerCase()}">${x(prio)}</span>
-      </div>
-      <div class="card-desc">${x(r[C.desc]||'')}</div>
-      ${obs ? `<div class="card-obs">💬 ${x(obs)}</div>` : ''}
-      <div class="card-footer">
-        <span class="card-resp"><span class="resp-dot">${inits}</span>${x(r[C.resp]||'')}</span>
-        <span class="pill ${pillClass(status)}">${x(status)}</span>
-        <span class="card-prazo">Prazo: <strong>${fmtDate(r[C.prazo])}</strong></span>
-      </div>`;
-    g.appendChild(card);
-  });
-}
-
-// ── FILTER ─────────────────────────────────────────────────────────────────
-function applyFilter(type, btn) {
-  activeFilter = type;
-  if (btn) { document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
-  document.querySelectorAll('.card').forEach(card => {
-    const p = card.dataset.prio, s = card.dataset.status;
-    let show = false;
-    if      (type === 'all') show = true;
-    else if (type === 'URGENTE' || type === 'IMPORTANTE') show = p === type;
-    else show = up(s) === up(type);
-    card.classList.toggle('hidden', !show);
-  });
-}
-
-// ── HELPERS ────────────────────────────────────────────────────────────────
-const up  = v => String(v||'').trim().toUpperCase();
-const x   = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const setText = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
-const setPB   = (id,a,b) => { const el=document.getElementById(id); if(el) el.style.width = b?Math.round(a/b*100)+'%':'0%'; };
-
-function pillClass(s) {
-  const m = {'a iniciar':'p-todo','em andamento':'p-doing','planejamento':'p-plan',
+  function pillClass(s) {
+    var m = {'a iniciar':'p-todo','em andamento':'p-doing','planejamento':'p-plan',
              'concluído':'p-done','concluido':'p-done','entregue':'p-entregue','recorrente':'p-rec'};
-  return m[s.toLowerCase()] || 'p-todo';
-}
+    return m[s.toLowerCase()] || 'p-todo';
+  }
 
-function fmtDate(v) {
-  if (!v) return '—';
-  if (typeof v === 'number') return new Date((v-25569)*86400*1000).toLocaleDateString('pt-BR');
-  const s = String(v);
-  return (s.toLowerCase()==='contínuo'||s.toLowerCase()==='continuo') ? 'Contínuo' : s;
-}
+  function fmtDate(v) {
+    if (!v) return '—';
+    if (typeof v === 'number') return new Date((v-25569)*86400*1000).toLocaleDateString('pt-BR');
+    var s = String(v);
+    return (s.toLowerCase()==='contínuo'||s.toLowerCase()==='continuo') ? 'Contínuo' : s;
+  }
 
-function setSt
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  function loadCfg() { try { return JSON.parse(localStorage.getItem('ba_cfg')||'{}'); } catch(e) { return {}; } }
+
+  function hideBanner() {
+    var b = $id('config-banner'); if(b) b.classList.add('hidden');
+  }
+
+  W.showConfig = function() {
+    var b = $id('config-banner'); if(b) b.classList.remove('hidden');
+  };
+
+  W.saveConfig = function() {
+    var t = ($id('cfg-tenant')||{value:''}).value.trim();
+    var c = ($id('cfg-client')||{value:''}).value.trim();
+    if (!t || !c) { alert('Preencha o Tenant ID e o Client ID.'); return; }
+    CFG = { tenantId:t, clientId:c };
+    localStorage.setItem('ba_cfg', JSON.stringify(CFG));
+    hideBanner();
+    setStatus('loading', 'Inicializando conexão com Microsoft…');
+    loadMsal(function() { initMsal(); });
+  };
+
+  // ── MSAL LOADER ───────────────────────────────────────────────────────────
+  function loadMsal(cb) {
+    if (typeof msal !== 'undefined') { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js';
+    s.onload = cb;
+    s.onerror = function() {
+      var s2 = document.createElement('script');
+      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.1/msal-browser.min.js';
+      s2.onload = cb;
+      s2.onerror = function() { setStatus('error', 'Falha ao carregar biblioteca Microsoft. Verifique sua conexão.'); };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  }
+
+  // ── MSAL INIT ─────────────────────────────────────────────────────────────
+  function initMsal() {
+    try {
+      msal_app = new msal.PublicClientApplication({
+        auth: {
+          clientId: CFG.clientId,
+          authority: 'https://login.microsoftonline.com/' + CFG.tenantId,
+          redirectUri: window.location.origin + window.location.pathname,
+        },
+        cache: { cacheLocation: 'localStorage' }
+      });
+      msal_app.handleRedirectPromise()
+        .then(function() {
+          W.fetchData();
+          if (timer) clearInterval(timer);
+          timer = setInterval(W.fetchData, 60000);
+        })
+        .catch(function(e) { setStatus('error', 'Auth: ' + e.message); });
+    } catch(e) {
+      setStatus('error', 'Erro ao inicializar MSAL: ' + e.message);
+    }
+  }
+
+  // ── TOKEN ─────────────────────────────────────────────────────────────────
+  function getToken() {
+    if (!msal_app) return Promise.reject(new Error('MSAL não inicializado.'));
+    var scopes = ['Files.Read', 'Sites.Read.All'];
+    var accts = msal_app.getAllAccounts();
+    if (accts.length) {
+      return msal_app.acquireTokenSilent({ scopes: scopes, account: accts[0] })
+        .then(function(r) { return r.accessToken; })
+        .catch(function() {
+          return msal_app.loginPopup({ scopes: scopes }).then(function(r) { return r.accessToken; });
+        });
+    }
+    return msal_app.loginPopup({ scopes: scopes }).then(function(r) { return r.accessToken; });
+  }
+
+  // ── GRAPH GET ─────────────────────────────────────────────────────────────
+  function gGet(token, path) {
+    return fetch('https://graph.microsoft.com/v1.0' + path, {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(function(r) {
+      if (!r.ok) return r.json().catch(function(){return{};}).then(function(b) {
+        throw new Error((b&&b.error&&b.error.message) || 'HTTP ' + r.status);
+      });
+      return r.json();
+    });
+  }
+
+  // ── FETCH DATA ────────────────────────────────────────────────────────────
+  W.fetchData = function() {
+    if (!msal_app) {
+      setStatus('error', 'Configure o Tenant ID e Client ID primeiro.');
+      W.showConfig();
+      return;
+    }
+    setStatus('loading', 'Buscando dados do Excel Online…');
+    getToken().then(function(token) {
+      return gGet(token, '/me').then(function(me) {
+        return '/users/' + encodeURIComponent(me.userPrincipalName) + '/drive';
+      }, function() {
+        return '/users/' + encodeURIComponent(UPN) + '/drive';
+      }).then(function(driveBase) {
+        return gGet(token, driveBase + '/root:/Documents/' + FILE_NAME)
+          .catch(function() { return gGet(token, driveBase + '/root:/' + FILE_NAME); })
+          .then(function(file) {
+            if (!file || !file.id) throw new Error('Arquivo não encontrado no OneDrive.');
+            var url = driveBase + '/items/' + file.id + '/workbook/worksheets/'
+              + encodeURIComponent(SHEET_NAME) + "/range(address='" + DATA_RANGE + "')";
+            return gGet(token, url);
+          });
+      });
+    }).then(function(data) {
+      var rows = (data.values || []).filter(function(r) {
+        return r[C.demanda] && String(r[C.demanda]).trim();
+      });
+      render(rows);
+      setStatus('ok', rows.length + ' demandas carregadas');
+      var el = $id('last-update');
+      if (el) el.textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+    }).catch(function(e) {
+      setStatus('error', e.message || String(e));
+      console.error(e);
+    });
+  };
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  function render(rows) {
+    var urg      = rows.filter(function(r){ return up(r[C.prio])==='URGENTE'; });
+    var imp      = rows.filter(function(r){ return up(r[C.prio])==='IMPORTANTE'; });
+    var doing    = rows.filter(function(r){ return up(r[C.status])==='EM ANDAMENTO'; });
+    var entregue = rows.filter(function(r){ return up(r[C.status])==='ENTREGUE'; });
+    var todo     = rows.filter(function(r){ return up(r[C.status])==='A INICIAR'; });
+    var n = rows.length;
+
+    setText('kpi-total',    n);
+    setText('kpi-urg',      urg.length);
+    setText('kpi-doing',    doing.length);
+    setText('kpi-entregue', entregue.length);
+    setText('kpi-todo',     todo.length);
+    setPB('pb-urg',      urg.length, n);
+    setPB('pb-doing',    doing.length, n);
+    setPB('pb-entregue', entregue.length, n);
+    setPB('pb-todo',     todo.length, n);
+    setText('cnt-urg', urg.length + ' demandas');
+    setText('cnt-imp', imp.length + ' demandas');
+
+    renderGrid('grid-urg', urg);
+    renderGrid('grid-imp', imp);
+    W.applyFilter(activeFilter);
+  }
+
+  function renderGrid(id, rows) {
+    var g = $id(id);
+    if (!g) return;
+    g.innerHTML = '';
+    if (!rows.length) {
+      g.innerHTML = '<div class="empty-state"><div class="icon">✓</div><p>Nenhuma demanda nesta categoria.</p></div>';
+      return;
+    }
+    rows.forEach(function(r, i) {
+      var prio   = String(r[C.prio]   || '').trim();
+      var status = String(r[C.status] || 'A iniciar').trim();
+      var obs    = String(r[C.obs]    || '').trim();
+      var inits  = String(r[C.resp]||'MP').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      var faded  = up(status) === 'ENTREGUE';
+      var card   = document.createElement('div');
+      card.className = 'card ' + prio.toLowerCase() + (faded ? ' faded' : '');
+      card.dataset.prio   = prio.toUpperCase();
+      card.dataset.status = status;
+      card.style.animationDelay = (i*0.05) + 's';
+      card.innerHTML =
+        '<div class="card-header">' +
+          '<span class="card-num">' + String(r[C.id]||(i+1)).padStart(2,'0') + '</span>' +
+          '<div class="card-title-wrap">' +
+            '<div class="card-title">' + x(r[C.demanda]) + '</div>' +
+            '<div class="card-sys">'   + x(r[C.sys]||'—') + '</div>' +
+          '</div>' +
+          '<span class="badge badge-' + prio.toLowerCase() + '">' + x(prio) + '</span>' +
+        '</div>' +
+        '<div class="card-desc">' + x(r[C.desc]||'') + '</div>' +
+        (obs ? '<div class="card-obs">💬 ' + x(obs) + '</div>' : '') +
+        '<div class="card-footer">' +
+          '<span class="card-resp"><span class="resp-dot">' + inits + '</span>' + x(r[C.resp]||'') + '</span>' +
+          '<span class="pill ' + pillClass(status) + '">' + x(status) + '</span>' +
+          '<span class="card-prazo">Prazo: <strong>' + fmtDate(r[C.prazo]) + '</strong></span>' +
+        '</div>';
+      g.appendChild(card);
+    });
+  }
+
+  // ── FILTER ────────────────────────────────────────────────────────────────
+  W.applyFilter = function(type, btn) {
+    activeFilter = type;
+    if (btn) {
+      document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+    }
+    document.querySelectorAll('.card').forEach(function(card) {
+      var p = card.dataset.prio, s = card.dataset.status;
+      var show = (type === 'all') ? true
+               : (type === 'URGENTE' || type === 'IMPORTANTE') ? p === type
+               : up(s) === up(type);
+      card.classList.toggle('hidden', !show);
+    });
+  };
+
+  // ── WEEK LABEL ────────────────────────────────────────────────────────────
+  function setWeek() {
+    var el = $id('header-week');
+    if (el) el.textContent = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+  }
+
+  // ── BOOT ──────────────────────────────────────────────────────────────────
+  function boot() {
+    setWeek();
+    CFG = loadCfg();
+    if (CFG.tenantId && CFG.clientId) {
+      hideBanner();
+      setStatus('loading', 'Carregando biblioteca Microsoft…');
+      loadMsal(function() { initMsal(); });
+    } else {
+      setStatus('error', 'Aguardando configuração — preencha os campos acima.');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+})(window);
+-e 
+</script>
+</body>
+</html>

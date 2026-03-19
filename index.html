@@ -268,10 +268,11 @@
   // ── CONSTANTES ────────────────────────────────────────────────────────────
   var TENANT_ID  = 'ea06a4f8-af74-49ad-ade9-90eedd9d720e';
   var CLIENT_ID  = '85f7de7e-7983-4c0f-92c2-376cfb34df68';
-  var FILE_NAME  = 'demandas_semana.xlsx';
   var SHEET_NAME = 'Demandas da Semana';
   var DATA_RANGE = 'A5:J17';
-  var UPN        = 'matheus.paz@boardacademy.com.br';
+  // IDs permanentes do arquivo (funciona para qualquer usuário com acesso compartilhado)
+  var DRIVE_ID   = 'b!Tt4u5TwxbU6_YVSwLoW4xexzBazJXR1LkUemLQbwcMRERc3DunBYR5HS4hAU9juw';
+  var ITEM_ID    = '016JQFDJTVWHNYGZUM4VFIGQQC2JAWPPCO';
   var C = { id:0, prio:1, demanda:2, desc:3, sys:4, resp:5, status:6, prazo:7, conc:8, obs:9 };
 
   // ── STATE ─────────────────────────────────────────────────────────────────
@@ -389,20 +390,12 @@
     }
     setStatus('loading', 'Buscando dados do Excel Online…');
     getToken().then(function(token) {
-      return gGet(token, '/me').then(function(me) {
-        return '/users/' + encodeURIComponent(me.userPrincipalName) + '/drive';
-      }, function() {
-        return '/users/' + encodeURIComponent(UPN) + '/drive';
-      }).then(function(driveBase) {
-        return gGet(token, driveBase + '/root:/Documents/' + FILE_NAME)
-          .catch(function() { return gGet(token, driveBase + '/root:/' + FILE_NAME); })
-          .then(function(file) {
-            if (!file || !file.id) throw new Error('Arquivo não encontrado no OneDrive.');
-            var url = driveBase + '/items/' + file.id + '/workbook/worksheets/'
-              + encodeURIComponent(SHEET_NAME) + "/range(address='" + DATA_RANGE + "')";
-            return gGet(token, url);
-          });
-      });
+      // Acessa o arquivo diretamente pelos IDs permanentes — funciona para
+      // qualquer usuário com acesso ao arquivo compartilhado, sem depender de UPN
+      var url = '/drives/' + DRIVE_ID + '/items/' + ITEM_ID
+        + '/workbook/worksheets/' + encodeURIComponent(SHEET_NAME)
+        + "/range(address='" + DATA_RANGE + "')";
+      return gGet(token, url);
     }).then(function(data) {
       var rows = (data.values || []).filter(function(r) {
         return r[C.demanda] && String(r[C.demanda]).trim();

@@ -136,6 +136,16 @@
   .footer-diamond { width:10px; height:10px; background:var(--gold); transform:rotate(45deg); opacity:0.5; }
   footer span { font-size:11px; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; }
 
+  /* FILTRO RESPONSÁVEL */
+  .resp-filter-bar { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+  .resp-filter-label { font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-right:4px; }
+  .resp-btn { display:flex; align-items:center; gap:7px; padding:6px 14px 6px 8px; border-radius:50px; border:1px solid rgba(201,168,76,0.2); background:transparent; color:var(--text-dim); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s; }
+  .resp-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .resp-btn.active { background:rgba(201,168,76,0.15); border-color:var(--gold); color:var(--gold-light); font-weight:600; }
+  .resp-btn .rb-dot { width:22px; height:22px; border-radius:50%; background:var(--navy-light); border:1px solid rgba(201,168,76,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:8px; color:var(--gold); font-weight:700; overflow:hidden; flex-shrink:0; }
+  .resp-btn .rb-dot img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+  .resp-btn.active .rb-dot { border-color:var(--gold); }
+
   @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
   @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:translateY(0)} }
   .hidden { display:none!important; }
@@ -202,6 +212,14 @@
       <div class="kpi-sub">pendentes</div>
       <div class="pb-wrap"><div class="pb" id="pb-todo" style="width:0%"></div></div>
     </div>
+  </div>
+
+  <!-- FILTRO RESPONSÁVEL -->
+  <div class="resp-filter-bar" id="resp-filter-bar">
+    <span class="resp-filter-label">Responsável:</span>
+    <button class="resp-btn active" data-resp="all" onclick="window.filterByResp('all',this)">
+      <span class="rb-dot" style="font-size:10px">✦</span> Todos
+    </button>
   </div>
 
   <!-- FILTERS -->
@@ -402,7 +420,11 @@
       // Pular as 4 primeiras linhas (título, subtítulo, vazia, cabeçalho)
       var allRows = data.values || [];
       var rows = allRows.slice(4).filter(function(r) {
-        return r[C.demanda] && String(r[C.demanda]).trim();
+        // Exige prioridade válida (URGENTE ou IMPORTANTE) para evitar
+        // capturar linhas das MBEs ou linhas vazias da planilha
+        var prio = String(r[C.prio]||'').trim().toUpperCase();
+        var demanda = String(r[C.demanda]||'').trim();
+        return demanda && (prio === 'URGENTE' || prio === 'IMPORTANTE');
       });
       render(rows);
       setStatus('ok', rows.length + ' demandas carregadas');
@@ -415,21 +437,7 @@
   };
 
   // ── FOTOS DE PERFIL ───────────────────────────────────────────────────────
-  // Mapa nome exibição → UPN do Microsoft 365
-  // Adicione aqui todos os membros do time que aparecem como responsáveis
-  // Mapa: nome exato como aparece na coluna "Responsável" do Excel → e-mail Microsoft 365
-  // Adicione novos membros aqui conforme necessário
-  // Mapa nome (como aparece no Excel) → e-mail Microsoft 365
-  // Adicione aqui qualquer novo membro do time
-  var UPN_MAP = {
-    'Matheus Paz':      'matheus.paz@boardacademy.com.br',
-    'Rodrigo Leira':    'rodrigo.leira@boardacademy.com.br',
-    'João Recchia':     'joao.recchia@boardacademy.com.br',
-    'Rodrigo':          'rodrigo.leira@boardacademy.com.br',
-    'Rodrigo / Camila': 'rodrigo.leira@boardacademy.com.br',
-    'Camila':           'camila@boardacademy.com.br',
-    'Naize':            'naize@boardacademy.com.br',
-  };
+  // Para ativar fotos de TODOS os usuários, adicione User.ReadBasic.All no Azure Portal
 
   function getToken_() {
     var keys = Object.keys(localStorage).filter(function(k){ return k.toLowerCase().includes('accesstoken'); });
@@ -440,51 +448,33 @@
     return token;
   }
 
-  function fetchPhoto(displayName, dotEl) {
-    if (!displayName || displayName === '—') return;
-
-    // Se já tiver em cache, aplica direto
-    if (photoCache[displayName] !== undefined) {
-      if (photoCache[displayName]) applyPhoto(dotEl, photoCache[displayName]);
-      return;
-    }
+  // Busca foto pelo UPN e aplica em todos os elementos daquele responsável
+  function fetchPhotoByUpn(upn, displayName) {
+    if (!upn || photoCache[displayName] !== undefined) return;
+    photoCache[displayName] = null; // evitar chamadas duplas
 
     var token = getToken_();
     if (!token) return;
 
-    // Buscar UPN pelo nome exato ou pelo primeiro nome (ex: "Rodrigo / Camila" → "Rodrigo")
-    var firstName = displayName.split('/')[0].trim();
-    var upn = UPN_MAP[displayName] || UPN_MAP[firstName];
-
-    // Se não tiver UPN mapeado, marca como null e mantém as iniciais
-    // NUNCA usar /me/photo como fallback pois retorna sempre a foto do usuário logado
-    if (!upn) {
-      photoCache[displayName] = null;
-      return;
-    }
-
     fetch('https://graph.microsoft.com/v1.0/users/' + upn + '/photo/$value', {
       headers: { Authorization: 'Bearer ' + token }
     })
-      .then(function(r) {
-        if (!r.ok) throw new Error('no photo');
-        return r.blob();
-      })
-      .then(function(blob) {
-        var url = URL.createObjectURL(blob);
-        photoCache[displayName] = url;
-        // Aplicar em TODOS os cards deste responsável (não só o atual)
-        document.querySelectorAll('.card').forEach(function(card) {
-          var cardResp = card.querySelector('.card-resp');
-          if (cardResp && cardResp.textContent.trim().startsWith(displayName.split('/')[0].trim())) {
-            var dot = card.querySelector('.resp-dot');
-            if (dot) applyPhoto(dot, url);
-          }
-        });
-      })
-      .catch(function() {
-        photoCache[displayName] = null;
+    .then(function(r) {
+      if (!r.ok) throw new Error('no photo');
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      photoCache[displayName] = url;
+      // Aplicar em todos os cards e botões de filtro deste responsável
+      document.querySelectorAll('[data-resp="' + displayName + '"] .resp-dot').forEach(function(dot) {
+        applyPhoto(dot, url);
       });
+      document.querySelectorAll('.resp-btn[data-resp="' + displayName + '"] .rb-dot').forEach(function(dot) {
+        applyPhoto(dot, url);
+      });
+    })
+    .catch(function() { /* sem foto — mantém iniciais */ });
   }
 
   function applyPhoto(dotEl, url) {
@@ -492,7 +482,54 @@
     dotEl.innerHTML = '<img src="' + url + '" alt="">';
   }
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
+  // ── FILTRO DE RESPONSÁVEL ─────────────────────────────────────────────────
+  var activeResp = 'all';
+
+  function buildRespFilter(responsaveis) {
+    var bar = $id('resp-filter-bar');
+    if (!bar) return;
+    // Remover botões antigos (manter o "Todos")
+    bar.querySelectorAll('.resp-btn:not([data-resp="all"])').forEach(function(b){ b.remove(); });
+
+    responsaveis.forEach(function(resp) {
+      if (!resp) return;
+      var inits = resp.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      var btn = document.createElement('button');
+      btn.className = 'resp-btn';
+      btn.dataset.resp = resp;
+      btn.innerHTML = '<span class="rb-dot">' + inits + '</span>' + resp.split(' ')[0];
+      btn.addEventListener('click', function(){ W.filterByResp(resp, btn); });
+      bar.appendChild(btn);
+
+      // Tentar buscar foto para este responsável
+      // O UPN é inferido do nome: "Primeiro Ultimo" → "primeiro.ultimo@boardacademy.com.br"
+      var parts = resp.toLowerCase().split(' ');
+      // Normalizar caracteres especiais
+      var normalize = function(s) { return s.normalize('NFD').replace(/[̀-ͯ]/g,''); };
+      var upnGuess = normalize(parts[0]) + '.' + normalize(parts[parts.length-1]) + '@boardacademy.com.br';
+      fetchPhotoByUpn(upnGuess, resp);
+    });
+  }
+
+  W.filterByResp = function(resp, btn) {
+    activeResp = resp;
+    document.querySelectorAll('.resp-btn').forEach(function(b){ b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    reapplyFilters();
+  };
+
+  function reapplyFilters() {
+    document.querySelectorAll('.card').forEach(function(card) {
+      var matchResp   = activeResp === 'all' || card.dataset.resp === activeResp;
+      var matchStatus = activeFilter === 'all' ? true
+        : (activeFilter === 'URGENTE' || activeFilter === 'IMPORTANTE')
+          ? card.dataset.prio === activeFilter
+          : up(card.dataset.status) === up(activeFilter);
+      card.classList.toggle('hidden', !(matchResp && matchStatus));
+    });
+  }
+
+    // ── RENDER ────────────────────────────────────────────────────────────────
   function render(rows) {
     var urg      = rows.filter(function(r){ return up(r[C.prio])==='URGENTE'; });
     var imp      = rows.filter(function(r){ return up(r[C.prio])==='IMPORTANTE'; });
@@ -513,9 +550,17 @@
     setText('cnt-urg', urg.length + ' demandas');
     setText('cnt-imp', imp.length + ' demandas');
 
+    // Coletar responsáveis únicos para o filtro
+    var resps = [];
+    rows.forEach(function(r) {
+      var resp = String(r[C.resp]||'').trim();
+      if (resp && resps.indexOf(resp) === -1) resps.push(resp);
+    });
+    buildRespFilter(resps);
+
     renderGrid('grid-urg', urg);
     renderGrid('grid-imp', imp);
-    W.applyFilter(activeFilter);
+    reapplyFilters();
   }
 
   function renderGrid(id, rows) {
@@ -536,6 +581,7 @@
       card.className = 'card ' + prio.toLowerCase() + (faded ? ' faded' : '');
       card.dataset.prio   = prio.toUpperCase();
       card.dataset.status = status;
+      card.dataset.resp   = String(r[C.resp]||'').trim();
       card.style.animationDelay = (i*0.05) + 's';
       card.innerHTML =
         '<div class="card-header">' +
@@ -554,11 +600,6 @@
           '<span class="card-prazo">Prazo: <strong>' + fmtDate(r[C.prazo]) + '</strong></span>' +
         '</div>';
       g.appendChild(card);
-
-      // Buscar foto do responsável e aplicar no avatar
-      var dotEl = card.querySelector('.resp-dot');
-      var respName = String(r[C.resp] || '').split('/')[0].trim();
-      if (respName && dotEl) fetchPhoto(respName, dotEl);
     });
   }
 
@@ -569,13 +610,7 @@
       document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
     }
-    document.querySelectorAll('.card').forEach(function(card) {
-      var p = card.dataset.prio, s = card.dataset.status;
-      var show = (type === 'all') ? true
-               : (type === 'URGENTE' || type === 'IMPORTANTE') ? p === type
-               : up(s) === up(type);
-      card.classList.toggle('hidden', !show);
-    });
+    reapplyFilters();
   };
 
   // ── WEEK LABEL ────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@ TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "ea06a4f8-af74-49ad-ade9-90eed
 CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "85f7de7e-7983-4c0f-92c2-376cfb34df68")
 CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "uIX8Q~OShLe~HULZnX1NRu-acFPx1glIBSX-raZj")
 
-ONEDRIVE_USER = "mariana_montagneri_boardacademy_com_br"
+ONEDRIVE_USER = "mariana.montagneri@boardacademy.com.br"
 FILE_COLAB    = "Colaboradores comercial.xlsx"
 FILE_METAS    = "metas_comercial.xlsx"
 FOLDER_FOTOS  = "Fotos - Time Comercial"

@@ -24,9 +24,9 @@ CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "85f7de7e-7983-4c0f-92c2-376cf
 CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "uIX8Q~OShLe~HULZnX1NRu-acFPx1glIBSX-raZj")
 
 ONEDRIVE_USER = "mariana.montagneri@boardacademy.com.br"
-FILE_COLAB    = "Colaboradores comercial.xlsx"
-FILE_METAS    = "metas_comercial.xlsx"
-FOLDER_FOTOS  = "Fotos - Time Comercial"
+FILE_COLAB    = "Relatórios de Weekly/Colaboradores comercial.xlsx"
+FILE_METAS    = "bases/metas_comercial.xlsx"
+FOLDER_FOTOS  = "Estratégias Comerciais/Fotos - Time Comercial"
 
 cores_padrao = ["#3498db","#e74c3c","#2ecc71","#9b59b6","#f39c12","#1abc9c","#e67e22"]
 colors = {"gold":"#D4AF37","text":"#ffffff","text_secondary":"#999999"}

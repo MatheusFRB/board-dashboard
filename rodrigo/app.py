@@ -55,7 +55,9 @@ def get_graph_token():
 def graph_get(path, token):
     r = requests.get(f"https://graph.microsoft.com/v1.0{path}",
                      headers={"Authorization":f"Bearer {token}"}, timeout=30)
-    r.raise_for_status()
+    if not r.ok:
+        st.error(f"Graph API erro {r.status_code}: {r.text}")
+        r.raise_for_status()
     return r
 
 def baixar_excel(token, nome):

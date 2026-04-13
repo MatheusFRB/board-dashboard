@@ -11,7 +11,7 @@ import streamlit as st
 import plotly.graph_objs as go
 
 # ==================== CONFIGURAÇÕES ====================
-API_TOKEN     = os.environ.get("PIPEDRIVE_TOKEN", "")
+API_TOKEN     = os.environ.get("PIPEDRIVE_TOKEN", "ea06a4f8-af74-49ad-ade9-90eedd9d720e")
 FILTER_ID     = 74674
 PIPEDRIVE_URL = (
     f"https://api.pipedrive.com/v1/deals"
@@ -21,7 +21,7 @@ PIPEDRIVE_URL = (
 
 TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "ea06a4f8-af74-49ad-ade9-90eedd9d720e")
 CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "85f7de7e-7983-4c0f-92c2-376cfb34df68")
-CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
+CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "uIX8Q~OShLe~HULZnX1NRu-acFPx1glIBSX-raZj")
 
 ONEDRIVE_USER = "mariana_montagneri_boardacademy_com_br"
 FILE_COLAB    = "Colaboradores comercial.xlsx"

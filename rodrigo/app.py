@@ -189,7 +189,8 @@ with c1:
     st.markdown(f"<p style='color:#999;font-size:28px;margin:0'>{mes_label}</p>", unsafe_allow_html=True)
 with c2:
     if d["logo"]:
-        st.markdown(f"<div style='text-align:right'><img src='data:image/png;base64,{d[\"logo\"]}' style='height:70px'></div>", unsafe_allow_html=True)
+        logo_b64 = d["logo"]
+        st.markdown(f"<div style='text-align:right'><img src='data:image/png;base64,{logo_b64}' style='height:70px'></div>", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 

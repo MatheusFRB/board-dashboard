@@ -16,7 +16,7 @@ FILTER_ID     = 74674
 PIPEDRIVE_URL = (
     f"https://api.pipedrive.com/v1/deals"
     f"?filter_id={FILTER_ID}&"
-    f"&limit=500&start=0&api_token={API_TOKEN}"
+    f"limit=500&start=0&api_token={API_TOKEN}"
 )
 
 TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "ea06a4f8-af74-49ad-ade9-90eedd9d720e")

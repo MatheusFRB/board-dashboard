@@ -4,17 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal de Preços 2026 — Board Academy</title>
-<style>html,body{display:none!important}</style>
+<style>#sso-overlay{position:fixed;inset:0;background:#000;z-index:999999}</style>
 <script>
-// Verifica sessão antes de qualquer coisa
 var _user = localStorage.getItem('ba_user');
 if (!_user) {
   window.location.replace("https://matheusfrb.github.io/board-dashboard/index.html");
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    document.documentElement.style.display = '';
-    document.body.style.display = '';
-  });
 }
 </script>
 <style>
@@ -246,6 +240,12 @@ a { color: #C8A028; }
 </style>
 </head>
 <body>
+<div id="sso-overlay"></div>
+<script>
+if (localStorage.getItem('ba_user')) {
+  document.getElementById('sso-overlay').style.display = 'none';
+}
+</script>
 
 <nav class="topnav">
   <div class="nav-logo" onclick="showPage('page-tabela')">

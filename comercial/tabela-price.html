@@ -1,9 +1,36 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal de Preços 2026 — Board Academy</title>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>body{visibility:hidden}</style>
+<script>
+(async () => {
+  try {
+    const msalConfig = {
+      auth: {
+        clientId: "85f7de7e-7983-4c0f-92c2-376cfb34df68",
+        authority: "https://login.microsoftonline.com/boardacademy.com.br",
+        redirectUri: "https://matheusfrb.github.io/board-dashboard/",
+        navigateToLoginRequestUrl: false,
+      },
+      cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
+    };
+    const msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length === 0) {
+      window.location.href = "https://matheusfrb.github.io/board-dashboard/index.html";
+    } else {
+      document.body.style.visibility = "visible";
+    }
+  } catch(e) {
+    window.location.href = "https://matheusfrb.github.io/board-dashboard/index.html";
+  }
+})();
+</script>
 <style>
 
 :root{
